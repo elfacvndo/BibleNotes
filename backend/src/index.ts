@@ -3,6 +3,7 @@ import http from 'http';
 import notesRouter from './routes/notes';
 import authRouter from './routes/auth';
 import uploadRouter from './routes/upload';
+import bookmarksRouter from './routes/bookmarks';
 import { authMiddleware } from './middleware/auth';
 import { createWebSocketServer } from './websocket';
 
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api/auth', authRouter);
 app.use('/api/notes', authMiddleware, notesRouter);
 app.use('/api/upload', authMiddleware, uploadRouter);
+app.use('/api/bookmarks', authMiddleware, bookmarksRouter);
 
 // Health Check
 app.get('/api/health', (req: Request, res: Response) => {

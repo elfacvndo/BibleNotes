@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import BookmarkList from '../bible/BookmarkList';
 
 const navItems = [
   { name: 'Dashboard', href: '/' },
@@ -34,6 +35,7 @@ const Sidebar: React.FC = () => {
           ))}
         </ul>
       </nav>
+      <BookmarkList />
     </aside>
   );
 };

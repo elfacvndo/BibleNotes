@@ -6,6 +6,7 @@ import { uploadImage } from '../../services/api';
 
 interface NoteEditorProps {
   noteToEdit?: Note | null;
+  initialContent?: string;
   onSave: (note: { title: string; content: string; tags: string[]; attachments: string[] }) => void;
   onClose: () => void;
   isSaving: boolean;
@@ -17,7 +18,7 @@ const templates = {
     "Predicazione": "<h3>Visita a: </h3><p>Data: </p><p>Argomento trattato: </p><p>Pubblicazione lasciata: </p><p>Domanda per la prossima volta: </p>"
 };
 
-const NoteEditor = ({ noteToEdit, onSave, onClose, isSaving }: NoteEditorProps) => {
+const NoteEditor = ({ noteToEdit, initialContent: initialContentProp, onSave, onClose, isSaving }: NoteEditorProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState('');
@@ -82,11 +83,11 @@ const NoteEditor = ({ noteToEdit, onSave, onClose, isSaving }: NoteEditorProps) 
       setAttachments(noteToEdit.attachments || []);
     } else {
       setTitle('');
-      setContent('');
+      setContent(initialContentProp || '');
       setTags('');
       setAttachments([]);
     }
-  }, [noteToEdit]);
+  }, [noteToEdit, initialContentProp]);
 
   const handleSave = () => {
     if (!title) {

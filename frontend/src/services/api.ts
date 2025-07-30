@@ -63,6 +63,7 @@ export const signupUser = async (userInfo: any) => {
 };
 
 
+
 // --- NOTES API ---
 export const getNotes = () => authenticatedRequest('/notes');
 export const createNote = (noteData: { title: string; content?: string; tags?: string[] }) => {
@@ -79,6 +80,20 @@ export const updateNote = (noteId: string, noteData: { title: string; content?: 
 };
 export const deleteNote = (noteId: string) => {
     return authenticatedRequest(`/notes/${noteId}`, {
+        method: 'DELETE',
+    });
+};
+
+// --- BOOKMARKS API ---
+export const getBookmarks = () => authenticatedRequest('/bookmarks');
+export const createBookmark = (bookmarkData: { book: string; chapter: number; verse: number }) => {
+    return authenticatedRequest('/bookmarks', {
+        method: 'POST',
+        body: JSON.stringify(bookmarkData),
+    });
+};
+export const deleteBookmark = (bookmarkId: string) => {
+    return authenticatedRequest(`/bookmarks/${bookmarkId}`, {
         method: 'DELETE',
     });
 };

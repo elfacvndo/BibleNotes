@@ -32,3 +32,14 @@ CREATE TRIGGER update_notes_updated_at
 BEFORE UPDATE ON notes
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+-- Create the bookmarks table
+CREATE TABLE bookmarks (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    book VARCHAR(255) NOT NULL,
+    chapter INTEGER NOT NULL,
+    verse INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, book, chapter, verse)
+);

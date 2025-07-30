@@ -29,7 +29,6 @@ const AppRouter: React.FC = () => {
                 <Route path="notes" element={<NotesPage />} />
                 <Route path="search" element={<SearchPage />} />
                 <Route path="bible" element={<BiblePage />} />
-                {/* Add other protected routes here */}
             </Route>
         ) : (
             <>
@@ -38,7 +37,6 @@ const AppRouter: React.FC = () => {
             </>
         )}
 
-        {/* Catch-all route */}
         <Route path="*" element={<Navigate to={isAuthenticated ? '/' : '/login'} replace />} />
     </Routes>
   );

@@ -59,3 +59,23 @@ export const deleteNoteById = async (noteId: string, userId: string) => {
     const { rows } = await db.query('DELETE FROM notes WHERE id = $1 AND user_id = $2 RETURNING *', [noteId, userId]);
     return rows[0];
 };
+
+// === BOOKMARKS DATABASE HELPERS ===
+
+export const getBookmarksByUserId = async (userId: string) => {
+    const { rows } = await db.query('SELECT * FROM bookmarks WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    return rows;
+};
+
+export const createBookmark = async (userId: string, book: string, chapter: number, verse: number) => {
+    const { rows } = await db.query(
+        'INSERT INTO bookmarks (user_id, book, chapter, verse) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, book, chapter, verse) DO NOTHING RETURNING *',
+        [userId, book, chapter, verse]
+    );
+    return rows[0];
+};
+
+export const deleteBookmarkById = async (bookmarkId: string, userId: string) => {
+    const { rows } = await db.query('DELETE FROM bookmarks WHERE id = $1 AND user_id = $2 RETURNING *', [bookmarkId, userId]);
+    return rows[0];
+};
