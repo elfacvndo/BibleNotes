@@ -1,76 +1,111 @@
-import React, { createContext, useState, ReactNode, useContext } from 'react';
-import { Note } from '../components/notes/NoteCard';
-// import { api } from '../services/api'; // We will create this next
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { getNotes, createNote, updateNote, deleteNote } from '../services/api';
+import { useAuth } from './AuthContext';
 
-// Mock data to start with
-const mockNotes: Note[] = [
-  {
-    id: '1',
-    title: 'Studio personale Torre di Guardia',
-    content: 'Paragrafo 5, la pazienza è fondamentale per mantenere la gioia. La scrittura chiave è Giacomo 1:4. Meditare su come applicarla nel ministero.',
-    category: 'Study',
-    tags: ['pazienza', 'studio'],
-    color: 'blue',
-    createdAt: new Date('2023-10-26T10:00:00Z').toISOString(),
-  },
-  {
-    id: '2',
-    title: 'Commento per l\'adunanza infrasettimanale',
-    content: 'Per la parte "Vita Cristiana", preparare un commento sulla scrittura di 2 Timoteo 3:16, 17, sottolineando l\'ispirazione divina.',
-    category: 'Meetings',
-    tags: ['adunanza', 'commento'],
-    color: 'gold',
-    createdAt: new Date('2023-10-25T15:30:00Z').toISOString(),
-  },
-];
-
+export interface Note {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
 
 interface NoteContextType {
   notes: Note[];
+  isLoading: boolean;
+  error: string | null;
   fetchNotes: () => Promise<void>;
-  addNote: (note: Partial<Note>) => Promise<void>;
-  // updateNote: (note: Note) => Promise<void>;
-  // deleteNote: (id: string) => Promise<void>;
+  addNote: (noteData: { title: string; content?: string; tags?: string[] }) => Promise<void>;
+  editNote: (noteId: string, noteData: { title: string; content?: string; tags?: string[] }) => Promise<void>;
+  removeNote: (noteId: string) => Promise<void>;
 }
 
-export const NoteContext = createContext<NoteContextType | undefined>(undefined);
+const NoteContext = createContext<NoteContextType | undefined>(undefined);
+
+export const NoteProvider = ({ children }: { children: ReactNode }) => {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
+
+  const fetchNotes = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const fetchedNotes = await getNotes();
+      setNotes(fetchedNotes);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch notes');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
+
+  const addNote = async (noteData: { title: string; content?: string; tags?: string[] }) => {
+    setIsLoading(true);
+    try {
+      const newNote = await createNote(noteData);
+      setNotes((prevNotes) => [newNote, ...prevNotes]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create note');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const editNote = async (noteId: string, noteData: { title: string; content?: string; tags?: string[] }) => {
+    setIsLoading(true);
+    try {
+      const updatedNote = await updateNote(noteId, noteData);
+      setNotes((prevNotes) =>
+        prevNotes.map((note) => (note.id === noteId ? updatedNote : note))
+      );
+    } catch (err: any) {
+      setError(err.message || 'Failed to update note');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeNote = async (noteId: string) => {
+    setIsLoading(true);
+    try {
+      await deleteNote(noteId);
+      setNotes((prevNotes) => prevNotes.filter((note) => note.id !== noteId));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete note');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const value = {
+    notes,
+    isLoading,
+    error,
+    fetchNotes,
+    addNote,
+    editNote,
+    removeNote,
+  };
+
+  return <NoteContext.Provider value={value}>{children}</NoteContext.Provider>;
+};
 
 export const useNotes = () => {
   const context = useContext(NoteContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useNotes must be used within a NoteProvider');
   }
   return context;
-};
-
-interface NoteProviderProps {
-  children: ReactNode;
-}
-
-export const NoteProvider = ({ children }: NoteProviderProps) => {
-  const [notes, setNotes] = useState<Note[]>(mockNotes);
-
-  const fetchNotes = async () => {
-    // const fetchedNotes = await api.getNotes();
-    // setNotes(fetchedNotes);
-    console.log("Pretending to fetch notes from API");
-  };
-
-  const addNote = async (noteData: Partial<Note>) => {
-    // const newNote = await api.createNote(noteData);
-    // setNotes(prevNotes => [newNote, ...prevNotes]);
-    const newNote = {
-        ...noteData,
-        id: String(notes.length + 1),
-        createdAt: new Date().toISOString(),
-    } as Note;
-    setNotes(prevNotes => [newNote, ...prevNotes]);
-    console.log("Pretending to save note to API", newNote);
-  };
-
-  return (
-    <NoteContext.Provider value={{ notes, fetchNotes, addNote }}>
-      {children}
-    </NoteContext.Provider>
-  );
 };

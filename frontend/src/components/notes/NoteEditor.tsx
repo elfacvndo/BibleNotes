@@ -1,79 +1,83 @@
-import React, { useState } from 'react';
-import { Note } from './NoteCard';
+import React, { useState, useEffect } from 'react';
+import { Note } from '../../context/NoteContext';
 import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css'; // Assuming Quill's snow theme
+import 'react-quill/dist/quill.snow.css';
 
 interface NoteEditorProps {
-  note?: Note | null; // Pass a note to edit, or null to create
-  onSave: (note: Partial<Note>) => void;
+  noteToEdit?: Note | null;
+  onSave: (note: { title: string; content: string; tags: string[] }) => void;
   onClose: () => void;
+  isSaving: boolean;
 }
 
-// A basic placeholder since I cannot install the real library
-const QuillEditor: any = ReactQuill;
+const NoteEditor = ({ noteToEdit, onSave, onClose, isSaving }: NoteEditorProps) => {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [tags, setTags] = useState('');
 
-const NoteEditor = ({ note, onSave, onClose }: NoteEditorProps) => {
-  const [title, setTitle] = useState(note?.title || '');
-  const [content, setContent] = useState(note?.content || '');
-  const [category, setCategory] = useState(note?.category || 'Study');
+  useEffect(() => {
+    if (noteToEdit) {
+      setTitle(noteToEdit.title);
+      setContent(noteToEdit.content);
+      setTags(noteToEdit.tags.join(', '));
+    } else {
+      setTitle('');
+      setContent('');
+      setTags('');
+    }
+  }, [noteToEdit]);
 
   const handleSave = () => {
     if (!title) {
-      alert('Il titolo è obbligatorio.');
+      // In a real app, show a more elegant notification
+      alert('Title is required.');
       return;
     }
-    onSave({
-      ...note,
-      title,
-      content,
-      category: category as Note['category'],
-    });
+    const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    onSave({ title, content, tags: tagsArray });
+  };
+
+  const modules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+      ['link'],
+      ['clean']
+    ],
   };
 
   return (
     <div className="flex flex-col gap-4">
       <input
         type="text"
-        placeholder="Titolo della nota"
+        placeholder="Note Title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md"
+        className="w-full p-2 bg-background dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md"
       />
-
-      {/*
-        NOTE: This is a placeholder for the rich text editor.
-        Without installing the package, this will not render correctly.
-        The `react-quill` library and its CSS need to be properly bundled.
-      */}
       <div className="h-64">
-         <QuillEditor
+         <ReactQuill
             theme="snow"
             value={content}
             onChange={setContent}
-            className="h-full"
+            modules={modules}
+            className="h-full bg-surface"
          />
       </div>
-
-      <div>
-        <label htmlFor="category" className="block text-sm font-medium mb-1">Categoria</label>
-        <select
-            id="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md"
-        >
-            <option value="Study">Studio</option>
-            <option value="Meetings">Adunanze</option>
-            <option value="Preaching">Predicazione</option>
-        </select>
-      </div>
-
+       <input
+        type="text"
+        placeholder="Tags (comma, separated)"
+        value={tags}
+        onChange={(e) => setTags(e.target.value)}
+        className="w-full p-2 mt-10 bg-background dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md"
+      />
       <div className="flex justify-end gap-2 mt-4">
         <button onClick={onClose} className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-600 hover:bg-gray-300">
-          Annulla
+          Cancel
         </button>
-        <button onClick={handleSave} className="px-4 py-2 rounded-md bg-jw-blue text-white hover:bg-opacity-90">
-          Salva
+        <button onClick={handleSave} disabled={isSaving} className="px-4 py-2 rounded-md bg-primary text-white hover:bg-primary-dark disabled:opacity-50">
+          {isSaving ? 'Saving...' : 'Save'}
         </button>
       </div>
     </div>

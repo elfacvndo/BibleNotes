@@ -1,11 +1,47 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { db } from '../services/db';
+import bcrypt from 'bcrypt';
+import { findUserByEmail, createUser } from '../services/db';
 
 const router = Router();
 
-// A secret for signing the token. In a real app, use an environment variable.
-const JWT_SECRET = process.env.JWT_SECRET || 'a-very-secret-key';
+// In a real app, use a secure, long, and random secret from an environment variable.
+const JWT_SECRET = process.env.JWT_SECRET || 'a-very-secret-and-long-key-that-is-not-guessable';
+const SALT_ROUNDS = 10;
+
+// POST /api/auth/signup
+router.post('/signup', async (req: Request, res: Response) => {
+  const { username, email, password } = req.body;
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: 'Username, email, and password are required' });
+  }
+
+  try {
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({ message: 'A user with this email already exists' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const newUser = await createUser(username, email, passwordHash);
+
+    const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(201).json({
+      token,
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+      },
+    });
+  } catch (error) {
+    console.error('Signup Error:', error);
+    res.status(500).json({ message: 'Server error during signup' });
+  }
+});
+
 
 // POST /api/auth/login
 router.post('/login', async (req: Request, res: Response) => {
@@ -16,38 +52,30 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 
   try {
-    const user = await db.findUserByEmail(email);
-
-    // In a real app, you would use bcrypt.compare to check the password
-    if (!user || password !== 'password') { // Placeholder password check
+    const user = await findUserByEmail(email);
+    if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // User is authenticated, create a token
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1h' });
+    const isPasswordCorrect = await bcrypt.compare(password, user.password_hash);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
     res.json({
       token,
       user: {
         id: user.id,
-        name: user.name,
+        username: user.username,
         email: user.email,
       },
     });
   } catch (error) {
+    console.error('Login Error:', error);
     res.status(500).json({ message: 'Server error during login' });
   }
-});
-
-// POST /api/auth/signup
-router.post('/signup', async (req: Request, res: Response) => {
-    // Placeholder for signup logic. A real implementation would:
-    // 1. Validate input
-    // 2. Check if user already exists
-    // 3. Hash the password with bcrypt
-    // 4. Save the new user to the database
-    // 5. Return a new token
-    res.status(501).json({ message: 'Signup not implemented yet' });
 });
 
 export default router;

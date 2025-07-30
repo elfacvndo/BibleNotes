@@ -1,84 +1,61 @@
-// This is a placeholder for actual database logic.
-// In a real application, this would interact with a PostgreSQL database.
+import { Pool } from 'pg';
 
-// === USER TYPE AND MOCK DATA ===
-export interface User {
-    id: string;
-    email: string;
-    name: string;
-    // In a real DB, you would store a hashed password, not the password itself
-    passwordHash: string;
-}
+// In a real application, you would use environment variables for this configuration
+const pool = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'biblenotes',
+  password: process.env.DB_PASSWORD || 'password',
+  port: parseInt(process.env.DB_PORT || '5432'),
+});
 
-const mockUsers: User[] = [
-    { id: '1', email: 'test@example.com', name: 'Test User', passwordHash: 'hashed_password' }
-];
-
-
-// === NOTE TYPE AND MOCK DATA ===
-export interface Note {
-  id: string;
-  userId: string;
-  title: string;
-  content: string;
-  category: 'Study' | 'Meetings' | 'Preaching';
-  tags: string[];
-  color: string;
-  createdAt: string;
-}
-
-const mockNotes: Note[] = [
-  {
-    id: '1',
-    userId: '1',
-    title: 'Studio personale Torre di Guardia',
-    content: 'Paragrafo 5, la pazienza è fondamentale.',
-    category: 'Study',
-    tags: ['pazienza', 'studio'],
-    color: 'blue',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    userId: '1',
-    title: 'Commento per l\'adunanza infrasettimanale',
-    content: 'Citare la scrittura di 2 Timoteo 3:16, 17.',
-    category: 'Meetings',
-    tags: ['adunanza', 'commento'],
-    color: 'gold',
-    createdAt: new Date().toISOString(),
-  },
-];
-
-// === MOCK DATABASE LOGIC ===
-// In a real app, you would use a query builder or ORM.
 export const db = {
-  // A generic query function for simulation
-  query: async (query: string, params?: any[]): Promise<{ rows: any[] }> => {
-    console.log('Mock DB Query:', query, params);
+  query: (text: string, params: any[]) => pool.query(text, params),
+};
 
-    // Simulate basic CRUD operations on mockNotes
-    if (query.startsWith('SELECT * FROM notes')) {
-      return { rows: mockNotes };
-    }
-    if (query.startsWith('SELECT * FROM notes WHERE id')) {
-        const id = params?.[0];
-        const note = mockNotes.find(n => n.id === id);
-        return { rows: note ? [note] : [] };
-    }
-    if (query.startsWith('INSERT INTO notes')) {
-        const newNote = params?.[0]; // In reality this would parse the values
-        const note = { ...newNote, id: String(mockNotes.length + 1), createdAt: new Date().toISOString() };
-        mockNotes.push(note);
-        return { rows: [note] };
-    }
+// You can also create more specific functions here, for example:
+export const findUserByEmail = async (email: string) => {
+  const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+  return rows[0];
+};
 
-    return { rows: [] };
-  },
+export const createUser = async (username: string, email: string, passwordHash: string) => {
+  const { rows } = await db.query(
+    'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
+    [username, email, passwordHash]
+  );
+  return rows[0];
+};
 
-  // Specific helper for finding a user
-  findUserByEmail: async (email: string): Promise<User | undefined> => {
-    console.log('Mock DB findUserByEmail:', email);
-    return mockUsers.find(user => user.email === email);
-  }
+// === NOTES DATABASE HELPERS ===
+
+export const getNotesByUserId = async (userId: string) => {
+  const { rows } = await db.query('SELECT * FROM notes WHERE user_id = $1 ORDER BY updated_at DESC', [userId]);
+  return rows;
+};
+
+export const getNoteById = async (noteId: string, userId: string) => {
+    const { rows } = await db.query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+    return rows[0];
+};
+
+export const createNote = async (userId: string, title: string, content: string, tags: string[]) => {
+    const { rows } = await db.query(
+        'INSERT INTO notes (user_id, title, content, tags) VALUES ($1, $2, $3, $4) RETURNING *',
+        [userId, title, content, tags]
+    );
+    return rows[0];
+};
+
+export const updateNoteById = async (noteId: string, userId: string, title: string, content: string, tags: string[]) => {
+    const { rows } = await db.query(
+        'UPDATE notes SET title = $1, content = $2, tags = $3, updated_at = NOW() WHERE id = $4 AND user_id = $5 RETURNING *',
+        [title, content, tags, noteId, userId]
+    );
+    return rows[0];
+};
+
+export const deleteNoteById = async (noteId: string, userId: string) => {
+    const { rows } = await db.query('DELETE FROM notes WHERE id = $1 AND user_id = $2 RETURNING *', [noteId, userId]);
+    return rows[0];
 };

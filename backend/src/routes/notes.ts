@@ -1,65 +1,109 @@
-import { Router, Request, Response } from 'express';
-import { db, Note } from '../services/db';
+import { Router, Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
+import { getNotesByUserId, getNoteById, createNote, updateNoteById, deleteNoteById } from '../services/db';
 
 const router = Router();
 
-// GET all notes
-router.get('/', async (req: Request, res: Response) => {
+// GET all notes for the authenticated user
+router.get('/', async (req: AuthRequest, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   try {
-    // In a real app, you'd get userId from auth token
-    const { rows } = await db.query('SELECT * FROM notes WHERE userId = $1', ['1']);
-    res.json(rows);
+    const notes = await getNotesByUserId(userId);
+    res.json(notes);
   } catch (error) {
+    console.error('Failed to fetch notes:', error);
     res.status(500).json({ error: 'Failed to fetch notes' });
   }
 });
 
 // GET a single note by ID
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id;
+    const { id: noteId } = req.params;
+    if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     try {
-        const { id } = req.params;
-        const { rows } = await db.query('SELECT * FROM notes WHERE id = $1', [id]);
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Note not found' });
+        const note = await getNoteById(noteId, userId);
+        if (!note) {
+            return res.status(404).json({ error: 'Note not found or you do not have permission to view it' });
         }
-        res.json(rows[0]);
+        res.json(note);
     } catch (error) {
+        console.error(`Failed to fetch note ${noteId}:`, error);
         res.status(500).json({ error: 'Failed to fetch note' });
     }
 });
 
 // POST a new note
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { title, content, category, tags, color } = req.body;
-    const newNote: Partial<Note> = { title, content, category, tags, color, userId: '1' };
-
-    // Basic validation
-    if (!title || !content) {
-        return res.status(400).json({ error: 'Title and content are required' });
+router.post('/', async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { rows } = await db.query('INSERT INTO notes (title, content, category, tags, color, userId) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-        [title, content, category, tags, color, '1']
-    );
+    try {
+        const { title, content, tags } = req.body;
+        if (!title) {
+            return res.status(400).json({ error: 'Title is required' });
+        }
 
-    res.status(201).json(rows[0]);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create note' });
-  }
+        const newNote = await createNote(userId, title, content || '', tags || []);
+        res.status(201).json(newNote);
+    } catch (error) {
+        console.error('Failed to create note:', error);
+        res.status(500).json({ error: 'Failed to create note' });
+    }
 });
 
 // PUT (update) a note
-router.put('/:id', async (req: Request, res: Response) => {
-    // Placeholder for update logic
-    res.status(501).json({ message: 'Update not implemented yet' });
+router.put('/:id', async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id;
+    const { id: noteId } = req.params;
+    if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+        const { title, content, tags } = req.body;
+        if (!title) {
+            return res.status(400).json({ error: 'Title is required' });
+        }
+
+        const updatedNote = await updateNoteById(noteId, userId, title, content || '', tags || []);
+        if (!updatedNote) {
+            return res.status(404).json({ error: 'Note not found or you do not have permission to edit it' });
+        }
+        res.json(updatedNote);
+    } catch (error) {
+        console.error(`Failed to update note ${noteId}:`, error);
+        res.status(500).json({ error: 'Failed to update note' });
+    }
 });
 
 // DELETE a note
-router.delete('/:id', async (req: Request, res: Response) => {
-    // Placeholder for delete logic
-    res.status(501).json({ message: 'Delete not implemented yet' });
-});
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
+    const userId = req.user?.id;
+    const { id: noteId } = req.params;
+    if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
 
+    try {
+        const deletedNote = await deleteNoteById(noteId, userId);
+        if (!deletedNote) {
+            return res.status(404).json({ error: 'Note not found or you do not have permission to delete it' });
+        }
+        res.status(200).json({ message: 'Note deleted successfully', note: deletedNote });
+    } catch (error) {
+        console.error(`Failed to delete note ${noteId}:`, error);
+        res.status(500).json({ error: 'Failed to delete note' });
+    }
+});
 
 export default router;
