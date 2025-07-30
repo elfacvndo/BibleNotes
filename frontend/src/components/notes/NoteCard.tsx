@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Note } from '../../context/NoteContext';
+import { parseNoteLinks } from '../../utils/noteUtils';
 
 const TrashIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -15,6 +16,7 @@ interface NoteCardProps {
 }
 
 const NoteCard = ({ note, onEdit, onDelete }: NoteCardProps) => {
+  const parsedContent = useMemo(() => parseNoteLinks(note.content), [note.content]);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent the card's onClick from firing
@@ -41,7 +43,7 @@ const NoteCard = ({ note, onEdit, onDelete }: NoteCardProps) => {
         {/* Using dangerouslySetInnerHTML to render the rich text content */}
         <div
             className="text-text-secondary text-sm mb-4 prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: note.content }}
+            dangerouslySetInnerHTML={{ __html: parsedContent }}
         />
       </div>
       <div className="flex justify-between items-end mt-4">

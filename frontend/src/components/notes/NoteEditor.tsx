@@ -11,6 +11,12 @@ interface NoteEditorProps {
   isSaving: boolean;
 }
 
+const templates = {
+    "Studio Personale": "<h2>Argomento: </h2><p>Scrittura chiave: </p><h3>Punti Principali:</h3><ul><li></li><li></li></ul><p>Applicazione personale: </p>",
+    "Preparazione Discorso": "<h2>Titolo del Discorso: </h2><h3>Introduzione:</h3><p></p><h3>Corpo:</h3><ol><li><h4>Punto 1:</h4><p></p></li><li><h4>Punto 2:</h4><p></p></li></ol><h3>Conclusione:</h3><p></p>",
+    "Predicazione": "<h3>Visita a: </h3><p>Data: </p><p>Argomento trattato: </p><p>Pubblicazione lasciata: </p><p>Domanda per la prossima volta: </p>"
+};
+
 const NoteEditor = ({ noteToEdit, onSave, onClose, isSaving }: NoteEditorProps) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -18,6 +24,12 @@ const NoteEditor = ({ noteToEdit, onSave, onClose, isSaving }: NoteEditorProps) 
   const [attachments, setAttachments] = useState<string[]>([]);
   const [wordCount, setWordCount] = useState(0);
   const quillRef = useRef<ReactQuill>(null);
+
+  const handleTemplateSelect = (templateName: keyof typeof templates) => {
+      if (window.confirm("Selezionando un modello, il contenuto attuale verrà sovrascritto. Continuare?")) {
+        setContent(templates[templateName]);
+      }
+  };
 
   // --- Image Upload Handler ---
   const imageHandler = () => {
@@ -33,20 +45,16 @@ const NoteEditor = ({ noteToEdit, onSave, onClose, isSaving }: NoteEditorProps) 
                 const res = await uploadImage(file);
                 const imageUrl = res.imageUrl;
 
-                // Insert image into editor
                 const quill = quillRef.current?.getEditor();
                 if (quill) {
                     const range = quill.getSelection(true);
                     quill.insertEmbed(range.index, 'image', imageUrl);
                     quill.setSelection(range.index + 1, 0);
                 }
-
-                // Add to attachments list
                 setAttachments(prev => [...prev, imageUrl]);
-
             } catch (error) {
                 console.error(error);
-                alert("Image upload failed!");
+                alert("Caricamento immagine fallito!");
             }
         }
     };
@@ -66,22 +74,17 @@ const NoteEditor = ({ noteToEdit, onSave, onClose, isSaving }: NoteEditorProps) 
     }
   };
 
-  // --- Effects and other handlers ---
-  const initialContent = useRef(noteToEdit?.content || '');
-
   useEffect(() => {
     if (noteToEdit) {
       setTitle(noteToEdit.title);
       setContent(noteToEdit.content);
       setTags(noteToEdit.tags.join(', '));
       setAttachments(noteToEdit.attachments || []);
-      initialContent.current = noteToEdit.content;
     } else {
       setTitle('');
       setContent('');
       setTags('');
       setAttachments([]);
-      initialContent.current = '';
     }
   }, [noteToEdit]);
 
@@ -102,13 +105,25 @@ const NoteEditor = ({ noteToEdit, onSave, onClose, isSaving }: NoteEditorProps) 
 
   return (
     <div className="flex flex-col gap-4 h-[60vh]">
-      <input
-        type="text"
-        placeholder="Titolo della Nota"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="w-full p-2 bg-background dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md"
-      />
+        <div className="flex justify-between items-center">
+            <input
+                type="text"
+                placeholder="Titolo della Nota"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full p-2 bg-background dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md"
+            />
+            {!noteToEdit && (
+                 <select
+                    onChange={(e) => handleTemplateSelect(e.target.value as keyof typeof templates)}
+                    className="p-2 ml-4 border border-gray-300 rounded-md"
+                    defaultValue=""
+                >
+                    <option value="" disabled>Scegli un modello...</option>
+                    {Object.keys(templates).map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+            )}
+        </div>
       <div className="flex-grow h-full">
          <ReactQuill
             ref={quillRef}
