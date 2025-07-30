@@ -82,3 +82,28 @@ export const deleteNote = (noteId: string) => {
         method: 'DELETE',
     });
 };
+
+// --- UPLOAD API ---
+export const uploadImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const token = getAuthToken();
+    const headers: HeadersInit = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Image upload failed');
+    }
+
+    return response.json();
+};

@@ -36,7 +36,7 @@ const LayoutController: React.FC = () => {
         setNoteToEdit(null);
     };
 
-    const handleSaveNote = async (noteData: { title: string; content: string; tags: string[] }) => {
+    const handleSaveNote = async (noteData: { title: string; content: string; tags: string[], attachments: string[] }) => {
         try {
             if (noteToEdit) {
                 await editNote(noteToEdit.id, noteData);

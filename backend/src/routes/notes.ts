@@ -49,12 +49,12 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     }
 
     try {
-        const { title, content, tags } = req.body;
+        const { title, content, tags, attachments } = req.body;
         if (!title) {
             return res.status(400).json({ error: 'Title is required' });
         }
 
-        const newNote = await createNote(userId, title, content || '', tags || []);
+        const newNote = await createNote(userId, title, content || '', tags || [], attachments || []);
         broadcastMessage({ type: 'NOTE_CREATED', payload: newNote });
         res.status(201).json(newNote);
     } catch (error) {
@@ -72,12 +72,12 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     try {
-        const { title, content, tags } = req.body;
+        const { title, content, tags, attachments } = req.body;
         if (!title) {
             return res.status(400).json({ error: 'Title is required' });
         }
 
-        const updatedNote = await updateNoteById(noteId, userId, title, content || '', tags || []);
+        const updatedNote = await updateNoteById(noteId, userId, title, content || '', tags || [], attachments || []);
         if (!updatedNote) {
             return res.status(404).json({ error: 'Note not found or you do not have permission to edit it' });
         }

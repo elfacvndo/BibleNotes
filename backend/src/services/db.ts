@@ -39,18 +39,18 @@ export const getNoteById = async (noteId: string, userId: string) => {
     return rows[0];
 };
 
-export const createNote = async (userId: string, title: string, content: string, tags: string[]) => {
+export const createNote = async (userId: string, title: string, content: string, tags: string[], attachments: string[] = []) => {
     const { rows } = await db.query(
-        'INSERT INTO notes (user_id, title, content, tags) VALUES ($1, $2, $3, $4) RETURNING *',
-        [userId, title, content, tags]
+        'INSERT INTO notes (user_id, title, content, tags, attachments) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [userId, title, content, tags, attachments]
     );
     return rows[0];
 };
 
-export const updateNoteById = async (noteId: string, userId: string, title: string, content: string, tags: string[]) => {
+export const updateNoteById = async (noteId: string, userId: string, title: string, content: string, tags: string[], attachments: string[] = []) => {
     const { rows } = await db.query(
-        'UPDATE notes SET title = $1, content = $2, tags = $3, updated_at = NOW() WHERE id = $4 AND user_id = $5 RETURNING *',
-        [title, content, tags, noteId, userId]
+        'UPDATE notes SET title = $1, content = $2, tags = $3, attachments = $4, updated_at = NOW() WHERE id = $5 AND user_id = $6 RETURNING *',
+        [title, content, tags, attachments, noteId, userId]
     );
     return rows[0];
 };

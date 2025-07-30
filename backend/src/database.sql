@@ -14,6 +14,7 @@ CREATE TABLE notes (
     title VARCHAR(255) NOT NULL,
     content TEXT,
     tags VARCHAR(255)[],
+    attachments TEXT[],
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

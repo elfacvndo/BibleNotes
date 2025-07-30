@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import http from 'http';
 import notesRouter from './routes/notes';
 import authRouter from './routes/auth';
+import uploadRouter from './routes/upload';
 import { authMiddleware } from './middleware/auth';
 import { createWebSocketServer } from './websocket';
 
@@ -13,7 +14,8 @@ app.use(express.json());
 
 // API Routes
 app.use('/api/auth', authRouter);
-app.use('/api/notes', authMiddleware, notesRouter); // Secure the notes routes
+app.use('/api/notes', authMiddleware, notesRouter);
+app.use('/api/upload', authMiddleware, uploadRouter);
 
 // Health Check
 app.get('/api/health', (req: Request, res: Response) => {
