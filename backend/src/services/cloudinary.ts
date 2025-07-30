@@ -1,5 +1,5 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 // Configure Cloudinary
 // In a real app, these values would come from a .env file

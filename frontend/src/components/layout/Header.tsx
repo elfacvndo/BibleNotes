@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ThemeContext } from '../../context/ThemeContext';
 import useDebounce from '../../hooks/useDebounce';
+import SyncStatus from '../common/SyncStatus';
 
 const SunIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -54,6 +55,7 @@ const Header = ({ onNewNote }: HeaderProps) => {
         />
       </div>
       <div className="flex items-center gap-4">
+        <SyncStatus />
         <span className="text-sm hidden sm:block">Benvenuto, {user?.username}!</span>
         <button
           onClick={onNewNote}

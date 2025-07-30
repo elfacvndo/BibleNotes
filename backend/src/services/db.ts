@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 
 // In a real application, you would use environment variables for this configuration
-const pool = new Pool({
+export const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'biblenotes',
@@ -49,7 +49,7 @@ export const createNote = async (userId: string, title: string, content: string,
 
 export const updateNoteById = async (noteId: string, userId: string, title: string, content: string, tags: string[], attachments: string[] = []) => {
     const { rows } = await db.query(
-        'UPDATE notes SET title = $1, content = $2, tags = $3, attachments = $4, updated_at = NOW() WHERE id = $5 AND user_id = $6 RETURNING *',
+        'UPDATE notes SET title = $1, content = $2, tags = $3, attachments = $4, version = version + 1, updated_at = NOW() WHERE id = $5 AND user_id = $6 RETURNING *',
         [title, content, tags, attachments, noteId, userId]
     );
     return rows[0];
@@ -78,4 +78,73 @@ export const createBookmark = async (userId: string, book: string, chapter: numb
 export const deleteBookmarkById = async (bookmarkId: string, userId: string) => {
     const { rows } = await db.query('DELETE FROM bookmarks WHERE id = $1 AND user_id = $2 RETURNING *', [bookmarkId, userId]);
     return rows[0];
+};
+
+// === SYNC DATABASE HELPERS ===
+
+interface SyncPayload {
+    updates?: { id: string; title: string; content: string; tags: string[]; attachments: string[]; version: number }[];
+    creations?: { local_id: string; title: string; content: string; tags: string[]; attachments: string[] }[];
+    deletions?: string[];
+}
+
+export const processSync = async (userId: string, payload: SyncPayload) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const results = {
+            created: [] as any[],
+            updated: [] as any[],
+            deleted: [] as string[],
+            conflicts: [] as any[],
+        };
+
+        // Process Deletions
+        if (payload.deletions) {
+            for (const noteId of payload.deletions) {
+                await client.query('DELETE FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+                results.deleted.push(noteId);
+            }
+        }
+
+        // Process Creations
+        if (payload.creations) {
+            for (const note of payload.creations) {
+                const { rows } = await client.query(
+                    'INSERT INTO notes (user_id, title, content, tags, attachments) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+                    [userId, note.title, note.content, note.tags, note.attachments]
+                );
+                results.created.push({ local_id: note.local_id, server_note: rows[0] });
+            }
+        }
+
+        // Process Updates
+        if (payload.updates) {
+            for (const note of payload.updates) {
+                const { rows: currentNotes } = await client.query('SELECT version FROM notes WHERE id = $1 AND user_id = $2', [note.id, userId]);
+                if (currentNotes.length === 0) continue; // Note might have been deleted
+
+                const currentVersion = currentNotes[0].version;
+                if (note.version === currentVersion) {
+                    const { rows: updatedRows } = await client.query(
+                        'UPDATE notes SET title = $1, content = $2, tags = $3, attachments = $4, version = version + 1, updated_at = NOW() WHERE id = $5 RETURNING *',
+                        [note.title, note.content, note.tags, note.attachments, note.id]
+                    );
+                    results.updated.push(updatedRows[0]);
+                } else {
+                    results.conflicts.push({ id: note.id, server_version: currentVersion });
+                }
+            }
+        }
+
+        await client.query('COMMIT');
+        return results;
+
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
 };

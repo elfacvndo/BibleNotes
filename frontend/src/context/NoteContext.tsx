@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
-import { getNotes, createNote, updateNote, deleteNote } from '../services/api';
+import { getNotes, syncChanges } from '../services/api';
 import { useAuth } from './AuthContext';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Note {
   id: string;
@@ -9,6 +10,7 @@ export interface Note {
   content: string;
   tags: string[];
   attachments: string[];
+  version: number;
   created_at: string;
   updated_at: string;
 }
@@ -16,10 +18,11 @@ export interface Note {
 interface NoteContextType {
   notes: Note[];
   isLoading: boolean;
+  isSyncing: boolean;
+  isOnline: boolean;
   error: string | null;
-  fetchNotes: () => Promise<void>;
-  addNote: (noteData: { title: string; content?: string; tags?: string[] }) => Promise<void>;
-  editNote: (noteId: string, noteData: { title: string; content?: string; tags?: string[] }) => Promise<void>;
+  addNote: (noteData: { title: string; content?: string; tags?: string[]; attachments?: string[] }) => Promise<void>;
+  editNote: (noteId: string, noteData: { title: string; content?: string; tags?: string[]; attachments?: string[] }) => Promise<void>;
   removeNote: (noteId: string) => Promise<void>;
 }
 
@@ -27,64 +30,64 @@ const NoteContext = createContext<NoteContextType | undefined>(undefined);
 
 export const NoteProvider = ({ children }: { children: ReactNode }) => {
   const [notes, setNotes] = useState<Note[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated } = useAuth();
-  const ws = useRef<WebSocket | null>(null);
 
-  // --- WebSocket Connection ---
+  const offlineQueue = useRef<any[]>(JSON.parse(localStorage.getItem('offlineQueue') || '[]'));
+
+  // --- Online/Offline Status ---
   useEffect(() => {
-    if (!isAuthenticated) {
-        return;
-    }
-
-    const connect = () => {
-        const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
-        ws.current = new WebSocket(wsUrl);
-
-        ws.current.onopen = () => {
-            console.log('WebSocket connected');
-        };
-
-        ws.current.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            console.log('WebSocket message received:', message);
-
-            switch (message.type) {
-                case 'NOTE_CREATED':
-                    setNotes(prev => [message.payload, ...prev]);
-                    break;
-                case 'NOTE_UPDATED':
-                    setNotes(prev => prev.map(n => n.id === message.payload.id ? message.payload : n));
-                    break;
-                case 'NOTE_DELETED':
-                    setNotes(prev => prev.filter(n => n.id !== message.payload.id));
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        ws.current.onclose = () => {
-            console.log('WebSocket disconnected. Attempting to reconnect...');
-            setTimeout(connect, 3000); // Reconnect after 3 seconds
-        };
-
-        ws.current.onerror = (err) => {
-            console.error('WebSocket error:', err);
-            ws.current?.close();
-        };
+    const handleOnline = () => {
+        setIsOnline(true);
+        processQueue();
     };
+    const handleOffline = () => setIsOnline(false);
 
-    connect();
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     return () => {
-        ws.current?.close();
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
     };
-  }, [isAuthenticated]);
+  }, []);
+
+  // --- Queue Processing ---
+  const processQueue = async () => {
+    if (offlineQueue.current.length === 0 || !isOnline) return;
+
+    setIsSyncing(true);
+    const payload = {
+        creations: offlineQueue.current.filter(op => op.type === 'create').map(op => op.payload),
+        updates: offlineQueue.current.filter(op => op.type === 'update').map(op => op.payload),
+        deletions: offlineQueue.current.filter(op => op.type === 'delete').map(op => op.payload.id),
+    };
+
+    try {
+        const results = await syncChanges(payload);
+        // TODO: Handle conflicts and update state properly
+        console.log("Sync results:", results);
+        offlineQueue.current = [];
+        localStorage.setItem('offlineQueue', '[]');
+        await fetchNotes(); // Re-fetch all notes to ensure consistency
+    } catch (err) {
+        console.error("Sync failed", err);
+        setError("Sync failed. Some changes may not be saved.");
+    } finally {
+        setIsSyncing(false);
+    }
+  };
+
+  const addToQueue = (action: any) => {
+      offlineQueue.current.push(action);
+      localStorage.setItem('offlineQueue', JSON.stringify(offlineQueue.current));
+  };
 
 
-  // --- REST API Functions ---
+  // --- Data Functions ---
   const fetchNotes = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoading(true);
@@ -103,33 +106,50 @@ export const NoteProvider = ({ children }: { children: ReactNode }) => {
     fetchNotes();
   }, [fetchNotes]);
 
-  // The REST-based functions are now optimistic and primarily for the current user's actions.
-  // The WebSocket will handle updates from other sources.
-  const addNote = async (noteData: { title: string; content?: string; tags?: string[] }) => {
-    // The backend will broadcast the change, so we don't need to add it to the state here.
-    // The UI will update when the WebSocket message is received.
-    await createNote(noteData);
+  const addNote = async (noteData: any) => {
+    if (isOnline) {
+        await syncChanges({ creations: [noteData] });
+        await fetchNotes(); // simple refetch for now
+    } else {
+        const newNote = { ...noteData, id: `local-${uuidv4()}`, version: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+        setNotes(prev => [newNote, ...prev]);
+        addToQueue({ type: 'create', payload: noteData });
+    }
   };
 
-  const editNote = async (noteId: string, noteData: { title: string; content?: string; tags?: string[] }) => {
-    await updateNote(noteId, noteData);
+  const editNote = async (noteId: string, noteData: any) => {
+     if (isOnline) {
+        await syncChanges({ updates: [{ id: noteId, ...noteData }] });
+        await fetchNotes();
+    } else {
+        setNotes(prev => prev.map(n => n.id === noteId ? { ...n, ...noteData, version: n.version + 1 } : n));
+        addToQueue({ type: 'update', payload: { id: noteId, ...noteData } });
+    }
   };
 
   const removeNote = async (noteId: string) => {
-    await deleteNote(noteId);
+    if (isOnline) {
+        await syncChanges({ deletions: [noteId] });
+        await fetchNotes();
+    } else {
+        setNotes(prev => prev.filter(n => n.id !== noteId));
+        addToQueue({ type: 'delete', payload: { id: noteId } });
+    }
   };
 
   const value = {
     notes,
     isLoading,
+    isSyncing,
+    isOnline,
     error,
-    fetchNotes,
     addNote,
     editNote,
     removeNote,
   };
 
-  return <NoteContext.Provider value={value}>{children}</NoteContext.Provider>;
+  // This is a simplified context that doesn't expose fetchNotes
+  return <NoteContext.Provider value={value as any}>{children}</NoteContext.Provider>;
 };
 
 export const useNotes = () => {

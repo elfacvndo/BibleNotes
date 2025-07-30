@@ -84,6 +84,14 @@ export const deleteNote = (noteId: string) => {
     });
 };
 
+// --- SYNC API ---
+export const syncChanges = (payload: any) => {
+    return authenticatedRequest('/sync', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+};
+
 // --- BOOKMARKS API ---
 export const getBookmarks = () => authenticatedRequest('/bookmarks');
 export const createBookmark = (bookmarkData: { book: string; chapter: number; verse: number }) => {
