@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useLocation, useOutletContext } from 'react-router-dom';
 import NotesGrid from '../components/notes/NotesGrid';
 import { useNotes, Note } from '../context/NoteContext';
+import { useSearch } from '../hooks/useSearch';
 
 function useQuery() {
     return new URLSearchParams(useLocation().search);
@@ -18,16 +19,7 @@ const SearchPage: React.FC = () => {
     const { notes } = useNotes();
     const { handleOpenEditorForEdit, handleDeleteNote } = useOutletContext<OutletContextType>();
 
-    const searchResults = useMemo(() => {
-        if (!searchTerm) {
-            return [];
-        }
-        return notes.filter(note =>
-            note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            note.tags.join(' ').toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [notes, searchTerm]);
+    const searchResults = useSearch(notes, searchTerm);
 
     return (
         <div className="p-6">

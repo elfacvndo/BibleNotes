@@ -1,7 +1,8 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ThemeContext } from '../../context/ThemeContext';
+import useDebounce from '../../hooks/useDebounce';
 
 const SunIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -23,14 +24,14 @@ const Header = ({ onNewNote }: HeaderProps) => {
   const { logout, user } = useAuth();
   const themeContext = useContext(ThemeContext);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const navigate = useNavigate();
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (searchTerm.trim()) {
-          navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
-      }
-  };
+  useEffect(() => {
+    if (debouncedSearchTerm.trim()) {
+        navigate(`/search?q=${encodeURIComponent(debouncedSearchTerm.trim())}`);
+    }
+  }, [debouncedSearchTerm, navigate]);
 
   if (!themeContext) {
     return null;
@@ -44,15 +45,13 @@ const Header = ({ onNewNote }: HeaderProps) => {
         <h1 className="text-xl font-bold text-primary">
             BibleNotes
         </h1>
-        <form onSubmit={handleSearchSubmit}>
-            <input
-                type="search"
-                placeholder="Cerca..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="p-2 border border-gray-300 rounded-md w-64"
-            />
-        </form>
+        <input
+            type="search"
+            placeholder="Cerca..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="p-2 border border-gray-300 rounded-md w-64"
+        />
       </div>
       <div className="flex items-center gap-4">
         <span className="text-sm hidden sm:block">Benvenuto, {user?.username}!</span>

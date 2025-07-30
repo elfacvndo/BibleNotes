@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import NotesGrid from '../components/notes/NotesGrid';
 import { useNotes, Note } from '../context/NoteContext';
+import { useSearch } from '../hooks/useSearch';
 
 interface OutletContextType {
     handleOpenEditorForEdit: (note: Note) => void;
@@ -15,25 +16,23 @@ const NotesPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState<'updated_at_desc' | 'updated_at_asc' | 'title_asc' | 'title_desc'>('updated_at_desc');
 
-    const filteredAndSortedNotes = useMemo(() => {
-        let filtered = notes.filter(note =>
-            note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            note.tags.join(' ').toLowerCase().includes(searchTerm.toLowerCase())
-        );
+    const searchResults = useSearch(notes, searchTerm);
+    const notesToDisplay = searchTerm ? searchResults : notes;
 
+    const sortedNotes = useMemo(() => {
+        const notesToSort = [...notesToDisplay];
         switch (sortOrder) {
             case 'title_asc':
-                return filtered.sort((a, b) => a.title.localeCompare(b.title));
+                return notesToSort.sort((a, b) => a.title.localeCompare(b.title));
             case 'title_desc':
-                return filtered.sort((a, b) => b.title.localeCompare(a.title));
+                return notesToSort.sort((a, b) => b.title.localeCompare(a.title));
             case 'updated_at_asc':
-                return filtered.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+                return notesToSort.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
             case 'updated_at_desc':
             default:
-                return filtered.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+                return notesToSort.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         }
-    }, [notes, searchTerm, sortOrder]);
+    }, [notesToDisplay, sortOrder]);
 
     return (
         <div className="p-6">
@@ -42,10 +41,10 @@ const NotesPage: React.FC = () => {
                 <div className="flex gap-4">
                     <input
                         type="text"
-                        placeholder="Cerca nelle note..."
+                        placeholder="Cerca... (es. \"frase esatta\" -parola)"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="p-2 border border-gray-300 rounded-md"
+                        className="p-2 border border-gray-300 rounded-md w-64"
                     />
                     <select
                         value={sortOrder}
@@ -63,7 +62,7 @@ const NotesPage: React.FC = () => {
             <NotesGrid
                 onEditNote={handleOpenEditorForEdit}
                 onDeleteNote={handleDeleteNote}
-                notes={filteredAndSortedNotes}
+                notes={sortedNotes}
             />
         </div>
     );
