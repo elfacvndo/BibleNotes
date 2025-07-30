@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { getNotesByUserId, getNoteById, createNote, updateNoteById, deleteNoteById } from '../services/db';
+import { broadcastMessage } from '../websocket';
 
 const router = Router();
 
@@ -54,6 +55,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         }
 
         const newNote = await createNote(userId, title, content || '', tags || []);
+        broadcastMessage({ type: 'NOTE_CREATED', payload: newNote });
         res.status(201).json(newNote);
     } catch (error) {
         console.error('Failed to create note:', error);
@@ -79,6 +81,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         if (!updatedNote) {
             return res.status(404).json({ error: 'Note not found or you do not have permission to edit it' });
         }
+        broadcastMessage({ type: 'NOTE_UPDATED', payload: updatedNote });
         res.json(updatedNote);
     } catch (error) {
         console.error(`Failed to update note ${noteId}:`, error);
@@ -99,6 +102,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
         if (!deletedNote) {
             return res.status(404).json({ error: 'Note not found or you do not have permission to delete it' });
         }
+        broadcastMessage({ type: 'NOTE_DELETED', payload: { id: noteId } });
         res.status(200).json({ message: 'Note deleted successfully', note: deletedNote });
     } catch (error) {
         console.error(`Failed to delete note ${noteId}:`, error);

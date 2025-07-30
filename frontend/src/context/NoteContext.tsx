@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
 import { getNotes, createNote, updateNote, deleteNote } from '../services/api';
 import { useAuth } from './AuthContext';
 
@@ -29,7 +29,61 @@ export const NoteProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated } = useAuth();
+  const ws = useRef<WebSocket | null>(null);
 
+  // --- WebSocket Connection ---
+  useEffect(() => {
+    if (!isAuthenticated) {
+        return;
+    }
+
+    const connect = () => {
+        const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
+        ws.current = new WebSocket(wsUrl);
+
+        ws.current.onopen = () => {
+            console.log('WebSocket connected');
+        };
+
+        ws.current.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            console.log('WebSocket message received:', message);
+
+            switch (message.type) {
+                case 'NOTE_CREATED':
+                    setNotes(prev => [message.payload, ...prev]);
+                    break;
+                case 'NOTE_UPDATED':
+                    setNotes(prev => prev.map(n => n.id === message.payload.id ? message.payload : n));
+                    break;
+                case 'NOTE_DELETED':
+                    setNotes(prev => prev.filter(n => n.id !== message.payload.id));
+                    break;
+                default:
+                    break;
+            }
+        };
+
+        ws.current.onclose = () => {
+            console.log('WebSocket disconnected. Attempting to reconnect...');
+            setTimeout(connect, 3000); // Reconnect after 3 seconds
+        };
+
+        ws.current.onerror = (err) => {
+            console.error('WebSocket error:', err);
+            ws.current?.close();
+        };
+    };
+
+    connect();
+
+    return () => {
+        ws.current?.close();
+    };
+  }, [isAuthenticated]);
+
+
+  // --- REST API Functions ---
   const fetchNotes = useCallback(async () => {
     if (!isAuthenticated) return;
     setIsLoading(true);
@@ -48,45 +102,20 @@ export const NoteProvider = ({ children }: { children: ReactNode }) => {
     fetchNotes();
   }, [fetchNotes]);
 
+  // The REST-based functions are now optimistic and primarily for the current user's actions.
+  // The WebSocket will handle updates from other sources.
   const addNote = async (noteData: { title: string; content?: string; tags?: string[] }) => {
-    setIsLoading(true);
-    try {
-      const newNote = await createNote(noteData);
-      setNotes((prevNotes) => [newNote, ...prevNotes]);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create note');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+    // The backend will broadcast the change, so we don't need to add it to the state here.
+    // The UI will update when the WebSocket message is received.
+    await createNote(noteData);
   };
 
   const editNote = async (noteId: string, noteData: { title: string; content?: string; tags?: string[] }) => {
-    setIsLoading(true);
-    try {
-      const updatedNote = await updateNote(noteId, noteData);
-      setNotes((prevNotes) =>
-        prevNotes.map((note) => (note.id === noteId ? updatedNote : note))
-      );
-    } catch (err: any) {
-      setError(err.message || 'Failed to update note');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+    await updateNote(noteId, noteData);
   };
 
   const removeNote = async (noteId: string) => {
-    setIsLoading(true);
-    try {
-      await deleteNote(noteId);
-      setNotes((prevNotes) => prevNotes.filter((note) => note.id !== noteId));
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete note');
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
+    await deleteNote(noteId);
   };
 
   const value = {
