@@ -1,4 +1,5 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ThemeContext } from '../../context/ThemeContext';
 
@@ -21,25 +22,45 @@ interface HeaderProps {
 const Header = ({ onNewNote }: HeaderProps) => {
   const { logout, user } = useAuth();
   const themeContext = useContext(ThemeContext);
+  const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (searchTerm.trim()) {
+          navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+      }
+  };
 
   if (!themeContext) {
-    return null; // Or some fallback
+    return null;
   }
 
   const { theme, toggleTheme } = themeContext;
 
   return (
     <header className="bg-surface shadow-sm p-4 flex justify-between items-center text-text-primary border-b border-gray-200 dark:border-gray-700">
-      <h1 className="text-xl font-bold text-primary">
-        BibleNotes
-      </h1>
       <div className="flex items-center gap-4">
-        <span className="text-sm hidden sm:block">Welcome, {user?.username}!</span>
+        <h1 className="text-xl font-bold text-primary">
+            BibleNotes
+        </h1>
+        <form onSubmit={handleSearchSubmit}>
+            <input
+                type="search"
+                placeholder="Cerca..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="p-2 border border-gray-300 rounded-md w-64"
+            />
+        </form>
+      </div>
+      <div className="flex items-center gap-4">
+        <span className="text-sm hidden sm:block">Benvenuto, {user?.username}!</span>
         <button
           onClick={onNewNote}
           className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-white hover:bg-primary-dark"
         >
-          New Note
+          Nuova Nota
         </button>
         <button
           onClick={toggleTheme}

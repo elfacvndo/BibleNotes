@@ -25,7 +25,7 @@ const NoteCard = ({ note, onEdit, onDelete }: NoteCardProps) => {
 
   return (
     <div
-        className="bg-surface p-4 rounded-lg shadow-md border-l-4 border-primary hover:shadow-lg hover:border-accent transition-all duration-200 flex flex-col justify-between h-48 cursor-pointer relative group"
+        className="bg-surface p-4 rounded-lg shadow-md border-l-4 border-primary hover:shadow-lg hover:border-accent transition-all duration-200 flex flex-col justify-between cursor-pointer relative group break-inside-avoid"
         onClick={() => onEdit(note)}
     >
       <button
@@ -37,12 +37,14 @@ const NoteCard = ({ note, onEdit, onDelete }: NoteCardProps) => {
       </button>
 
       <div>
-        <h3 className="text-lg font-bold mb-2 truncate text-text-primary">{note.title}</h3>
-        <p className="text-text-secondary text-sm mb-4 overflow-hidden h-20">
-          {note.content}
-        </p>
+        <h3 className="text-lg font-bold mb-2 text-text-primary">{note.title}</h3>
+        {/* Using dangerouslySetInnerHTML to render the rich text content */}
+        <div
+            className="text-text-secondary text-sm mb-4 prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ __html: note.content }}
+        />
       </div>
-      <div className="flex justify-between items-end">
+      <div className="flex justify-between items-end mt-4">
         <div className="text-xs text-text-secondary">
             {new Date(note.updated_at).toLocaleDateString()}
         </div>

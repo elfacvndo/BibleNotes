@@ -6,12 +6,15 @@ import Spinner from '../common/Spinner';
 interface NotesGridProps {
   onEditNote: (note: Note) => void;
   onDeleteNote: (noteId: string) => void;
+  notes?: Note[]; // Make notes optional
 }
 
-const NotesGrid = ({ onEditNote, onDeleteNote }: NotesGridProps) => {
-  const { notes, isLoading, error } = useNotes();
+const NotesGrid = ({ onEditNote, onDeleteNote, notes: notesFromProps }: NotesGridProps) => {
+  const { notes: notesFromContext, isLoading, error } = useNotes();
 
-  if (isLoading) {
+  const notes = notesFromProps || notesFromContext;
+
+  if (isLoading && !notesFromProps) {
     return (
       <div className="flex justify-center items-center h-64">
         <Spinner size="lg" />
@@ -22,24 +25,26 @@ const NotesGrid = ({ onEditNote, onDeleteNote }: NotesGridProps) => {
   if (error) {
     return (
       <div className="text-center text-error">
-        <p>Error loading notes: {error}</p>
+        <p>Errore nel caricamento delle note: {error}</p>
       </div>
     );
   }
 
   if (notes.length === 0) {
     return (
-      <div className="text-center text-text-secondary">
-        <p>You don't have any notes yet.</p>
-        <p>Click "New Note" to get started!</p>
+      <div className="text-center text-text-secondary py-10">
+        <p className="font-semibold">Non hai ancora nessuna nota.</p>
+        <p className="text-sm">Clicca "Nuova Nota" per iniziare!</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="columns-1 sm:columns-2 lg:columns-3 gap-6">
       {notes.map((note) => (
-        <NoteCard key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} />
+        <div key={note.id} className="mb-6">
+            <NoteCard note={note} onEdit={onEditNote} onDelete={onDeleteNote} />
+        </div>
       ))}
     </div>
   );
