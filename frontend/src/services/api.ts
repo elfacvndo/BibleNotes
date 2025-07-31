@@ -6,7 +6,7 @@ const getAuthToken = () => {
 
 // Base request function for authenticated endpoints
 const authenticatedRequest = async (endpoint: string, options: RequestInit = {}) => {
-  const token = getAuthToken();
+  const token = getAuthToke();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -61,7 +61,6 @@ export const signupUser = async (userInfo: any) => {
     }
     return response.json();
 };
-
 
 
 // --- NOTES API ---

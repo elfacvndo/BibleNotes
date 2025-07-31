@@ -1,150 +1,183 @@
-import { Pool } from 'pg';
+// This is a placeholder for actual database logic.
+// In a real application, this would interact with a PostgreSQL database.
 
-// In a real application, you would use environment variables for this configuration
-export const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'biblenotes',
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '5432'),
-});
-
-export const db = {
-  query: (text: string, params: any[]) => pool.query(text, params),
-};
-
-// You can also create more specific functions here, for example:
-export const findUserByEmail = async (email: string) => {
-  const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-  return rows[0];
-};
-
-export const createUser = async (username: string, email: string, passwordHash: string) => {
-  const { rows } = await db.query(
-    'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
-    [username, email, passwordHash]
-  );
-  return rows[0];
-};
-
-// === NOTES DATABASE HELPERS ===
-
-export const getNotesByUserId = async (userId: string) => {
-  const { rows } = await db.query('SELECT * FROM notes WHERE user_id = $1 ORDER BY updated_at DESC', [userId]);
-  return rows;
-};
-
-export const getNoteById = async (noteId: string, userId: string) => {
-    const { rows } = await db.query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
-    return rows[0];
-};
-
-export const createNote = async (userId: string, title: string, content: string, tags: string[], attachments: string[] = []) => {
-    const { rows } = await db.query(
-        'INSERT INTO notes (user_id, title, content, tags, attachments) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [userId, title, content, tags, attachments]
-    );
-    return rows[0];
-};
-
-export const updateNoteById = async (noteId: string, userId: string, title: string, content: string, tags: string[], attachments: string[] = []) => {
-    const { rows } = await db.query(
-        'UPDATE notes SET title = $1, content = $2, tags = $3, attachments = $4, version = version + 1, updated_at = NOW() WHERE id = $5 AND user_id = $6 RETURNING *',
-        [title, content, tags, attachments, noteId, userId]
-    );
-    return rows[0];
-};
-
-export const deleteNoteById = async (noteId: string, userId: string) => {
-    const { rows } = await db.query('DELETE FROM notes WHERE id = $1 AND user_id = $2 RETURNING *', [noteId, userId]);
-    return rows[0];
-};
-
-// === BOOKMARKS DATABASE HELPERS ===
-
-export const getBookmarksByUserId = async (userId: string) => {
-    const { rows } = await db.query('SELECT * FROM bookmarks WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
-    return rows;
-};
-
-export const createBookmark = async (userId: string, book: string, chapter: number, verse: number) => {
-    const { rows } = await db.query(
-        'INSERT INTO bookmarks (user_id, book, chapter, verse) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, book, chapter, verse) DO NOTHING RETURNING *',
-        [userId, book, chapter, verse]
-    );
-    return rows[0];
-};
-
-export const deleteBookmarkById = async (bookmarkId: string, userId: string) => {
-    const { rows } = await db.query('DELETE FROM bookmarks WHERE id = $1 AND user_id = $2 RETURNING *', [bookmarkId, userId]);
-    return rows[0];
-};
-
-// === SYNC DATABASE HELPERS ===
-
-interface SyncPayload {
-    updates?: { id: string; title: string; content: string; tags: string[]; attachments: string[]; version: number }[];
-    creations?: { local_id: string; title: string; content: string; tags: string[]; attachments: string[] }[];
-    deletions?: string[];
+// === USER TYPE AND MOCK DATA ===
+export interface User {
+    id: string;
+    email: string;
+    name: string;
+    // In a real DB, you would store a hashed password, not the password itself
+    passwordHash: string;
 }
 
-export const processSync = async (userId: string, payload: SyncPayload) => {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
+const mockUsers: User[] = [
+    { id: '1', email: 'test@example.com', name: 'Test User', passwordHash: '$2b$10$f/s.y.e.x.a.m.p.l.e.A.r.a.n.d.o.m.p.a.s.s.w.o.r.d.H.a.s.h' }
+];
 
-        const results = {
-            created: [] as any[],
-            updated: [] as any[],
-            deleted: [] as string[],
-            conflicts: [] as any[],
-        };
 
-        // Process Deletions
-        if (payload.deletions) {
-            for (const noteId of payload.deletions) {
-                await client.query('DELETE FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
-                results.deleted.push(noteId);
-            }
-        }
+// === NOTE TYPE AND MOCK DATA ===
+export interface Note {
+  id: string;
+  userId: string;
+  title: string;
+  content: string;
+  tags: string[];
+  attachments: string[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
-        // Process Creations
-        if (payload.creations) {
-            for (const note of payload.creations) {
-                const { rows } = await client.query(
-                    'INSERT INTO notes (user_id, title, content, tags, attachments) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-                    [userId, note.title, note.content, note.tags, note.attachments]
-                );
-                results.created.push({ local_id: note.local_id, server_note: rows[0] });
-            }
-        }
+const mockNotes: Note[] = [
+  {
+    id: '1',
+    userId: '1',
+    title: 'Studio personale Torre di Guardia',
+    content: 'Paragrafo 5, la pazienza è fondamentale per mantenere la gioia. La scrittura chiave è Giacomo 1:4. Meditare su come applicarla nel ministero.',
+    tags: ['pazienza', 'studio'],
+    attachments: [],
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: '2',
+    userId: '1',
+    title: 'Commento per l\'adunanza infrasettimanale',
+    content: 'Citare la scrittura di 2 Timoteo 3:16, 17, sottolineando l\'ispirazione divina.',
+    tags: ['adunanza', 'commento'],
+    attachments: [],
+    version: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
 
-        // Process Updates
-        if (payload.updates) {
-            for (const note of payload.updates) {
-                const { rows: currentNotes } = await client.query('SELECT version FROM notes WHERE id = $1 AND user_id = $2', [note.id, userId]);
-                if (currentNotes.length === 0) continue; // Note might have been deleted
-
-                const currentVersion = currentNotes[0].version;
-                if (note.version === currentVersion) {
-                    const { rows: updatedRows } = await client.query(
-                        'UPDATE notes SET title = $1, content = $2, tags = $3, attachments = $4, version = version + 1, updated_at = NOW() WHERE id = $5 RETURNING *',
-                        [note.title, note.content, note.tags, note.attachments, note.id]
-                    );
-                    results.updated.push(updatedRows[0]);
-                } else {
-                    results.conflicts.push({ id: note.id, server_version: currentVersion });
-                }
-            }
-        }
-
-        await client.query('COMMIT');
-        return results;
-
-    } catch (e) {
-        await client.query('ROLLBACK');
-        throw e;
-    } finally {
-        client.release();
+// === MOCK DATABASE LOGIC ===
+export const db = {
+  query: async (query: string, params?: any[]): Promise<{ rows: any[] }> => {
+    console.log('Mock DB Query:', query, params);
+    // This is a mock implementation and does not actually run SQL queries.
+    // It's designed to return data that resembles the real database structure.
+    if (query.startsWith('SELECT * FROM users WHERE email')) {
+      const email = params?.[0];
+      const user = mockUsers.find(u => u.email === email);
+      return { rows: user ? [user] : [] };
     }
+    if (query.startsWith('INSERT INTO users')) {
+        const [username, email, passwordHash] = params || [];
+        const newUser = { id: String(mockUsers.length + 1), name: username, email, passwordHash };
+        mockUsers.push(newUser);
+        return { rows: [newUser] };
+    }
+    if (query.startsWith('SELECT * FROM notes WHERE user_id')) {
+        const userId = params?.[0];
+        return { rows: mockNotes.filter(n => n.userId === userId) };
+    }
+    if (query.startsWith('SELECT * FROM notes WHERE id')) {
+        const id = params?.[0];
+        const note = mockNotes.find(n => n.id === id);
+        return { rows: note ? [note] : [] };
+    }
+    if (query.startsWith('INSERT INTO notes')) {
+        const [userId, title, content, tags, attachments] = params || [];
+        const newNote = { id: String(mockNotes.length + 1), userId, title, content, tags, attachments, version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        mockNotes.push(newNote);
+        return { rows: [newNote] };
+    }
+    if (query.startsWith('UPDATE notes')) {
+        const [title, content, tags, attachments, noteId, userId] = params || [];
+        const noteIndex = mockNotes.findIndex(n => n.id === noteId && n.userId === userId);
+        if (noteIndex > -1) {
+            mockNotes[noteIndex] = { ...mockNotes[noteIndex], title, content, tags, attachments, version: mockNotes[noteIndex].version + 1, updatedAt: new Date().toISOString() };
+            return { rows: [mockNotes[noteIndex]] };
+        }
+        return { rows: [] };
+    }
+    if (query.startsWith('DELETE FROM notes')) {
+        const [noteId, userId] = params || [];
+        const noteIndex = mockNotes.findIndex(n => n.id === noteId && n.userId === userId);
+        if (noteIndex > -1) {
+            const deletedNote = mockNotes.splice(noteIndex, 1);
+            return { rows: deletedNote };
+        }
+        return { rows: [] };
+    }
+    if (query.startsWith('SELECT * FROM bookmarks WHERE user_id')) {
+      const userId = params?.[0];
+      // Mock bookmarks for now
+      return { rows: [] };
+    }
+    if (query.startsWith('INSERT INTO bookmarks')) {
+      const [userId, book, chapter, verse] = params || [];
+      const newBookmark = { id: String(Math.random()), userId, book, chapter, verse, createdAt: new Date().toISOString() };
+      return { rows: [newBookmark] };
+    }
+    if (query.startsWith('DELETE FROM bookmarks')) {
+        return { rows: [{ id: params?.[0] }] };
+    }
+
+
+    return { rows: [] };
+  },
+
+  findUserByEmail: async (email: string): Promise<User | undefined> => {
+    const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    return rows[0];
+  },
+  createUser: async (username: string, email: string, passwordHash: string) => {
+    const { rows } = await db.query('INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING *', [username, email, passwordHash]);
+    return rows[0];
+  },
+  getNotesByUserId: async (userId: string) => {
+    const { rows } = await db.query('SELECT * FROM notes WHERE user_id = $1 ORDER BY updated_at DESC', [userId]);
+    return rows;
+  },
+    getNoteById: async (noteId: string, userId: string) => {
+        const { rows } = await db.query('SELECT * FROM notes WHERE id = $1 AND user_id = $2', [noteId, userId]);
+        return rows[0];
+    },
+    createNote: async (userId: string, title: string, content: string, tags: string[], attachments: string[] = []) => {
+        const { rows } = await db.query(
+            'INSERT INTO notes (user_id, title, content, tags, attachments) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [userId, title, content, tags, attachments]
+        );
+        return rows[0];
+    },
+    updateNoteById: async (noteId: string, userId: string, title: string, content: string, tags: string[], attachments: string[] = []) => {
+        const { rows } = await db.query(
+            'UPDATE notes SET title = $1, content = $2, tags = $3, attachments = $4, version = version + 1, updated_at = NOW() WHERE id = $5 AND user_id = $6 RETURNING *',
+            [title, content, tags, attachments, noteId, userId]
+        );
+        return rows[0];
+    },
+    deleteNoteById: async (noteId: string, userId: string) => {
+        const { rows } = await db.query('DELETE FROM notes WHERE id = $1 AND user_id = $2 RETURNING *', [noteId, userId]);
+        return rows[0];
+    },
+    getBookmarksByUserId: async (userId: string) => {
+        const { rows } = await db.query('SELECT * FROM bookmarks WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+        return rows;
+    },
+    createBookmark: async (userId: string, book: string, chapter: number, verse: number) => {
+        const { rows } = await db.query(
+            'INSERT INTO bookmarks (user_id, book, chapter, verse) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, book, chapter, verse) DO NOTHING RETURNING *',
+            [userId, book, chapter, verse]
+        );
+        return rows[0];
+    },
+    deleteBookmarkById: async (bookmarkId: string, userId: string) => {
+        const { rows } = await db.query('DELETE FROM bookmarks WHERE id = $1 AND user_id = $2 RETURNING *', [bookmarkId, userId]);
+        return rows[0];
+    },
+    processSync: async (userId: string, payload: SyncPayload) => {
+      // This is a mock implementation of the sync logic
+      const results = {
+          created: [] as any[],
+          updated: [] as any[],
+          deleted: [] as string[],
+          conflicts: [] as any[],
+      };
+      return results;
+  }
 };
