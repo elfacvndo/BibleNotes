@@ -37,8 +37,8 @@ const mockNotes: Note[] = [
     tags: ['pazienza', 'studio'],
     attachments: [],
     version: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date('2023-10-26T10:00:00Z').toISOString(),
+    updatedAt: new Date('2023-10-26T10:00:00Z').toISOString(),
   },
   {
     id: '2',
@@ -48,8 +48,8 @@ const mockNotes: Note[] = [
     tags: ['adunanza', 'commento'],
     attachments: [],
     version: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date('2023-10-25T15:30:00Z').toISOString(),
+    updatedAt: new Date('2023-10-25T15:30:00Z').toISOString(),
   },
 ];
 
