@@ -1,0 +1,21 @@
+{
+  "short_name": "BibleNotes",
+  "name": "BibleNotes - Appunti Spirituali",
+  "description": "Un'applicazione per testimoni di Geova per gestire appunti spirituali con sincronizzazione cloud.",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192.png?text=BN",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://via.placeholder.com/512.png?text=BibleNotes",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1e40af",
+  "background_color": "#f8fafc"
+}

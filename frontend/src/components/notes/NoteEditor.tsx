@@ -1,80 +1,157 @@
-import React, { useState } from 'react';
-import { Note } from './NoteCard';
+import React, { useState, useEffect, useRef } from 'react';
+import { Note } from '../../context/NoteContext';
 import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css'; // Assuming Quill's snow theme
+import 'react-quill/dist/quill.snow.css';
+import { uploadImage } from '../../services/api';
 
 interface NoteEditorProps {
-  note?: Note | null; // Pass a note to edit, or null to create
-  onSave: (note: Partial<Note>) => void;
+  noteToEdit?: Note | null;
+  initialContent?: string;
+  onSave: (note: { title: string; content: string; tags: string[]; attachments: string[] }) => void;
   onClose: () => void;
+  isSaving: boolean;
 }
 
-// A basic placeholder since I cannot install the real library
-const QuillEditor: any = ReactQuill;
+const templates = {
+    "Studio Personale": "<h2>Argomento: </h2><p>Scrittura chiave: </p><h3>Punti Principali:</h3><ul><li></li><li></li></ul><p>Applicazione personale: </p>",
+    "Preparazione Discorso": "<h2>Titolo del Discorso: </h2><h3>Introduzione:</h3><p></p><h3>Corpo:</h3><ol><li><h4>Punto 1:</h4><p></p></li><li><h4>Punto 2:</h4><p></p></li></ol><h3>Conclusione:</h3><p></p>",
+    "Predicazione": "<h3>Visita a: </h3><p>Data: </p><p>Argomento trattato: </p><p>Pubblicazione lasciata: </p><p>Domanda per la prossima volta: </p>"
+};
 
-const NoteEditor = ({ note, onSave, onClose }: NoteEditorProps) => {
-  const [title, setTitle] = useState(note?.title || '');
-  const [content, setContent] = useState(note?.content || '');
-  const [category, setCategory] = useState(note?.category || 'Study');
+const NoteEditor = ({ noteToEdit, initialContent: initialContentProp, onSave, onClose, isSaving }: NoteEditorProps) => {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [tags, setTags] = useState('');
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [wordCount, setWordCount] = useState(0);
+  const quillRef = useRef<ReactQuill>(null);
+
+  const handleTemplateSelect = (templateName: keyof typeof templates) => {
+      if (window.confirm("Selezionando un modello, il contenuto attuale verrà sovrascritto. Continuare?")) {
+        setContent(templates[templateName]);
+      }
+  };
+
+  // --- Image Upload Handler ---
+  const imageHandler = () => {
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = async () => {
+        if (input.files) {
+            const file = input.files[0];
+            try {
+                const res = await uploadImage(file);
+                const imageUrl = res.imageUrl;
+
+                const quill = quillRef.current?.getEditor();
+                if (quill) {
+                    const range = quill.getSelection(true);
+                    quill.insertEmbed(range.index, 'image', imageUrl);
+                    quill.setSelection(range.index + 1, 0);
+                }
+                setAttachments(prev => [...prev, imageUrl]);
+            } catch (error) {
+                console.error(error);
+                alert("Caricamento immagine fallito!");
+            }
+        }
+    };
+  };
+
+  const modules = {
+    toolbar: {
+        container: [
+            [{ 'header': [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+            [{'list': 'ordered'}, {'list': 'bullet'}],
+            ['link', 'image', 'clean']
+        ],
+        handlers: {
+            'image': imageHandler
+        }
+    }
+  };
+
+  useEffect(() => {
+    if (noteToEdit) {
+      setTitle(noteToEdit.title);
+      setContent(noteToEdit.content);
+      setTags(noteToEdit.tags.join(', '));
+      setAttachments(noteToEdit.attachments || []);
+    } else {
+      setTitle('');
+      setContent(initialContentProp || '');
+      setTags('');
+      setAttachments([]);
+    }
+  }, [noteToEdit, initialContentProp]);
 
   const handleSave = () => {
     if (!title) {
       alert('Il titolo è obbligatorio.');
       return;
     }
-    onSave({
-      ...note,
-      title,
-      content,
-      category: category as Note['category'],
-    });
+    const tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    onSave({ title, content, tags: tagsArray, attachments });
   };
 
-  return (
-    <div className="flex flex-col gap-4">
-      <input
-        type="text"
-        placeholder="Titolo della nota"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md"
-      />
+  useEffect(() => {
+    const text = content.replace(/<[^>]*>?/gm, '');
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    setWordCount(words.length);
+  }, [content]);
 
-      {/*
-        NOTE: This is a placeholder for the rich text editor.
-        Without installing the package, this will not render correctly.
-        The `react-quill` library and its CSS need to be properly bundled.
-      */}
-      <div className="h-64">
-         <QuillEditor
+  return (
+    <div className="flex flex-col gap-4 h-[60vh]">
+        <div className="flex justify-between items-center">
+            <input
+                type="text"
+                placeholder="Titolo della Nota"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full p-2 bg-background dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md"
+            />
+            {!noteToEdit && (
+                 <select
+                    onChange={(e) => handleTemplateSelect(e.target.value as keyof typeof templates)}
+                    className="p-2 ml-4 border border-gray-300 rounded-md"
+                    defaultValue=""
+                >
+                    <option value="" disabled>Scegli un modello...</option>
+                    {Object.keys(templates).map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+            )}
+        </div>
+      <div className="flex-grow h-full">
+         <ReactQuill
+            ref={quillRef}
             theme="snow"
             value={content}
             onChange={setContent}
-            className="h-full"
+            modules={modules}
+            className="h-full bg-surface"
          />
       </div>
-
-      <div>
-        <label htmlFor="category" className="block text-sm font-medium mb-1">Categoria</label>
-        <select
-            id="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full p-2 bg-gray-100 dark:bg-gray-700 rounded-md"
-        >
-            <option value="Study">Studio</option>
-            <option value="Meetings">Adunanze</option>
-            <option value="Preaching">Predicazione</option>
-        </select>
-      </div>
-
-      <div className="flex justify-end gap-2 mt-4">
-        <button onClick={onClose} className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-600 hover:bg-gray-300">
-          Annulla
-        </button>
-        <button onClick={handleSave} className="px-4 py-2 rounded-md bg-jw-blue text-white hover:bg-opacity-90">
-          Salva
-        </button>
+       <input
+        type="text"
+        placeholder="Etichette (separate da virgola)"
+        value={tags}
+        onChange={(e) => setTags(e.target.value)}
+        className="w-full p-2 mt-10 bg-background dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md"
+      />
+      <div className="flex justify-between items-center mt-4">
+        <span className="text-xs text-text-secondary">{wordCount} parole</span>
+        <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-md bg-gray-200 dark:bg-gray-600 hover:bg-gray-300">
+              Annulla
+            </button>
+            <button onClick={handleSave} disabled={isSaving} className="px-4 py-2 rounded-md bg-primary text-white hover:bg-primary-dark disabled:opacity-50">
+              {isSaving ? 'Salvataggio...' : 'Salva'}
+            </button>
+        </div>
       </div>
     </div>
   );
