@@ -1,0 +1,41 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar {
+  background-color: #f0f0f0;
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+}
+
+.sidebar {
+  width: 200px;
+  background-color: #f8f8f8;
+  border-right: 1px solid #ccc;
+  padding: 10px;
+}
+
+.slide-thumbnail {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.slide-thumbnail:hover {
+  background-color: #eee;
+}
+
+.canvas {
+  flex: 1;
+  padding: 20px;
+  background-color: #fff;
+  overflow: auto;
+}
